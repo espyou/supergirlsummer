@@ -483,7 +483,7 @@ function ProgressTab({ data, onDataChange, onSave }) {
           return (
             <div key={m.id} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6, padding:"10px 14px", background:C.card, borderLeft:`3px solid ${accent}` }}>
               <div style={{ flex:1, fontSize:13, color:C.white, fontWeight:500 }}>{m.label}</div>
-              {(m.id==="sprint_10"||m.id==="sprint_30")&&(
+              {(m.id==="sprint_10"||m.id==="sprint_30"||m.id==="sled_20"||m.id==="slalom")&&(
                 <button onClick={()=>setStopwatch({ metricId:m.id, who:whoFilter, label:`${m.label} — ${whoFilter==="you"?"You":"Her"}` })}
                   style={{ background:"none", border:`1px solid #1a2035`, color:C.dim, padding:"5px 8px", fontSize:13, cursor:"pointer", borderRadius:2, fontFamily:font.body, lineHeight:1 }}
                   title="Open stopwatch">⏱</button>
