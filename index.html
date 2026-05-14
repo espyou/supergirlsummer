@@ -14,7 +14,7 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script type="text/babel">
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
 const SUPABASE_URL = 'https://xhuovzkhicdxrgmhvnow.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_zjdMXawIwAIRW8C3Rq9Hjg_OlZKiCxE';
@@ -440,6 +440,7 @@ function ProgressTab({ data, onDataChange, onSave }) {
   const [entries, setEntries] = useState(()=>data[`w${week}`]||{});
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [stopwatch, setStopwatch] = useState(null);
 
   useEffect(()=>{ setEntries(data[`w${week}`]||{}); }, [week, data]);
 
@@ -482,6 +483,11 @@ function ProgressTab({ data, onDataChange, onSave }) {
           return (
             <div key={m.id} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6, padding:"10px 14px", background:C.card, borderLeft:`3px solid ${accent}` }}>
               <div style={{ flex:1, fontSize:13, color:C.white, fontWeight:500 }}>{m.label}</div>
+              {(m.id==="sprint_10"||m.id==="sprint_30")&&(
+                <button onClick={()=>setStopwatch({ metricId:m.id, who:whoFilter, label:`${m.label} — ${whoFilter==="you"?"You":"Her"}` })}
+                  style={{ background:"none", border:`1px solid #1a2035`, color:C.dim, padding:"5px 8px", fontSize:13, cursor:"pointer", borderRadius:2, fontFamily:font.body, lineHeight:1 }}
+                  title="Open stopwatch">⏱</button>
+              )}
               <input type="number" step="0.01" placeholder="—" value={val}
                 onChange={e=>handleChange(m.id,whoFilter,e.target.value)}
                 style={{ width:80, background:"#05080f", border:`1px solid #1a2035`, color:C.white, padding:"6px 10px", fontSize:14, fontFamily:font.body, borderRadius:2, textAlign:"right", outline:"none" }}
@@ -503,6 +509,7 @@ function ProgressTab({ data, onDataChange, onSave }) {
 
   return (
     <div>
+      {stopwatch&&<Stopwatch label={stopwatch.label} onRecord={val=>handleChange(stopwatch.metricId,stopwatch.who,val)} onClose={()=>setStopwatch(null)}/>}
       <SectionHeader label="Track Progress" title="MEASUREMENTS" />
       <p style={{ fontSize:13, color:C.muted, marginBottom:20, lineHeight:1.6 }}>Record baseline Week 1. Re-test at start of each new phase. Deltas appear automatically once you have two data points.</p>
       <div style={{ marginBottom:28 }}>
@@ -576,6 +583,54 @@ function ProgressTab({ data, onDataChange, onSave }) {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function Stopwatch({ label, onRecord, onClose }) {
+  const [running, setRunning] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [done, setDone] = useState(false);
+  const startRef = useRef(null);
+  const rafRef = useRef(null);
+
+  const tick = () => { setElapsed(Date.now() - startRef.current); rafRef.current = requestAnimationFrame(tick); };
+
+  const handleStart = () => {
+    startRef.current = Date.now() - elapsed;
+    setRunning(true); setDone(false);
+    rafRef.current = requestAnimationFrame(tick);
+  };
+  const handleStop = () => { cancelAnimationFrame(rafRef.current); setRunning(false); setDone(true); };
+  const handleReset = () => { cancelAnimationFrame(rafRef.current); setRunning(false); setElapsed(0); setDone(false); };
+  const handleRecord = () => { onRecord((elapsed/1000).toFixed(2)); onClose(); };
+
+  useEffect(()=>()=>cancelAnimationFrame(rafRef.current), []);
+
+  const secs = Math.floor(elapsed/1000);
+  const ms = Math.floor((elapsed%1000)/10);
+  const display = `${secs}.${ms.toString().padStart(2,'0')}`;
+
+  return (
+    <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.93)", zIndex:2000, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:"#0d1220", border:`1px solid #1a2035`, borderTop:`4px solid ${C.gold}`, maxWidth:320, width:"100%", padding:"40px 32px 32px", borderRadius:2, textAlign:"center" }}>
+        <div style={{ fontSize:10, letterSpacing:"0.25em", textTransform:"uppercase", color:C.gold, marginBottom:6 }}>Stopwatch</div>
+        <div style={{ fontSize:13, color:C.muted, marginBottom:28 }}>{label}</div>
+        <div style={{ fontFamily:font.display, fontSize:80, color:done?C.gold:running?C.white:"#333", letterSpacing:"0.03em", lineHeight:1, marginBottom:36, transition:"color 0.2s" }}>{display}</div>
+        <div style={{ display:"flex", gap:10, justifyContent:"center", marginBottom:20 }}>
+          {!running&&!done&&(
+            <button onClick={handleStart} style={{ background:C.blue, border:"none", color:C.white, padding:"16px 40px", fontSize:15, fontWeight:700, fontFamily:font.body, cursor:"pointer", borderRadius:2, letterSpacing:"0.1em", textTransform:"uppercase" }}>Start</button>
+          )}
+          {running&&(
+            <button onClick={handleStop} style={{ background:C.red, border:"none", color:C.white, padding:"16px 40px", fontSize:15, fontWeight:700, fontFamily:font.body, cursor:"pointer", borderRadius:2, letterSpacing:"0.1em", textTransform:"uppercase" }}>Stop</button>
+          )}
+          {done&&(<>
+            <button onClick={handleRecord} style={{ background:C.blue, border:"none", color:C.white, padding:"14px 24px", fontSize:13, fontWeight:700, fontFamily:font.body, cursor:"pointer", borderRadius:2, letterSpacing:"0.08em", textTransform:"uppercase" }}>Record {display}s</button>
+            <button onClick={handleReset} style={{ background:"none", border:`1px solid ${C.border}`, color:C.dim, padding:"14px 20px", fontSize:13, fontFamily:font.body, cursor:"pointer", borderRadius:2, letterSpacing:"0.08em", textTransform:"uppercase" }}>Redo</button>
+          </>)}
+        </div>
+        <button onClick={onClose} style={{ background:"none", border:"none", color:"#333", fontSize:11, cursor:"pointer", fontFamily:font.body, letterSpacing:"0.1em", textTransform:"uppercase" }}>Cancel</button>
+      </div>
     </div>
   );
 }
