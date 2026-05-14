@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Supergirl Summer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet"/>
+  <style>* { box-sizing: border-box; margin: 0; padding: 0; }</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel">
+const { useState, useEffect } = React;
+
+const SUPABASE_URL = 'https://xhuovzkhicdxrgmhvnow.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_zjdMXawIwAIRW8C3Rq9Hjg_OlZKiCxE';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function loadData(userId) {
+  try {
+    const { data } = await db.from('progress').select('data').eq('user_id', userId).maybeSingle();
+    return data?.data || {};
+  } catch { return {}; }
+}
+
+async function saveData(userId, d) {
+  try {
+    const { data: existing } = await db.from('progress').select('id').eq('user_id', userId).maybeSingle();
+    if (existing) {
+      await db.from('progress').update({ data: d, updated_at: new Date().toISOString() }).eq('user_id', userId);
+    } else {
+      await db.from('progress').insert({ user_id: userId, data: d });
+    }
+  } catch {}
+}
+
+const PHASES = [
+  { num:1, weeks:"1–3", name:"BUILD", color:"#1a3a8f", desc:"Movement quality, base conditioning, skill foundation." },
+  { num:2, weeks:"4–6", name:"LOAD", color:"#e8c44a", desc:"Increase intensity. Olympic lifts introduced. 1v1 concepts begin." },
+  { num:3, weeks:"7–9", name:"POWER", color:"#c41e2a", desc:"Max speed, peak explosive output, positional awareness under fatigue." },
+  { num:4, weeks:"10–12", name:"PEAK", color:"#f0f4ff", desc:"Volume -30%. Intensity stays max. Tryout simulation. Full retest." },
+];
+
+const EXERCISES = {
+  "Trap Bar Jump Squat": {
+    who:"you", summary:"Light load, maximum jump intent. This is a power movement — not a strength movement.",
+    cues:["Load light — the moment you grind it, you've missed the point","Stand fully tall at the top of each rep before resetting","Every single jump must be maximal intent — drop weight if needed","Land softly, absorbing through hips and knees","Full reset between reps — no touch-and-go"],
+    faults:["Too much load — turns into a squat, kills power output entirely","Passive jumps — going through motions rather than max intent","Rushing reps — treat each one as a fresh explosive effort"],
+    scaling:"No trap bar: goblet jump squat with a KB. Keep load very light regardless.",
+  },
+  "Hang Power Clean": {
+    who:"you", summary:"Highest sprint transfer of any gym movement. Speed and explosion over load — always.",
+    cues:["Start from hang — bar just above knees","Hinge hips back first, then explosively drive them through","Shrug violently at the top before pulling under","Catch in a quarter squat — not a full squat","Elbows up and through fast in the catch"],
+    faults:["Pulling with arms too early — legs and hips must initiate","Bar swinging away from body — keep it close throughout","Catching too deep — if in a full squat, reset the load","Slow pull — the entire movement should feel like a single violent explosion"],
+    scaling:"Technique breaking down: swap to heavy KB swings. Same hip hinge power pattern, lower injury risk.",
+  },
+  "Sled Sprint": {
+    who:"you", summary:"Applied power. You must be sprinting — not pushing. Load calibration is everything.",
+    cues:["Lean aggressively into the sled — aim for 45 degree body angle","Drive knees up, not just backward","Arm drive should match leg cadence — powerful and rhythmic","Stay on balls of feet — no heel contact","Full effort every rep — rest longer before the next one if needed"],
+    faults:["Too much load — turns a sprint into a push, completely different training stimulus","Upright posture — kills forward drive","Short choppy steps — drive through full triple extension each stride"],
+    scaling:"Week 7 calibration: load should allow ~80% of your unloaded sprint speed. Start lighter than you think.",
+  },
+  "KB Swing": {
+    who:"you", summary:"Hip hinge power endurance. Feeds the hang clean pattern. Don't squat it.",
+    cues:["Hinge from hips — this is not a squat","Snap hips through explosively — the bell floats from hip drive alone","Tighten glutes and abs hard at the top","Let bell swing back between legs under control — load the hinge","Keep lats engaged throughout — protect the lower back"],
+    faults:["Squatting instead of hinging — knees should not track forward much","Using arms to lift the bell — all power from the hips","Soft top position — full hip lockout on every rep"],
+    scaling:"Increase weight only when you hit 15 reps with perfect form. Not before.",
+  },
+  "Nordic Hamstring Curl": {
+    who:"you", summary:"Injury prevention — not a power movement. #1 evidence-backed exercise for hamstring strain. Non-negotiable at 41 while sprinting at max effort.",
+    cues:["Anchor feet under sled, rack, or have someone hold","Lower as slowly as humanly possible under full control","Catch yourself with hands at the bottom","Push back up with hands — the concentric does not matter","Stay rigid from knees to shoulders throughout"],
+    faults:["Dropping fast — the slow eccentric IS the entire exercise","Hips breaking — must stay in a straight line","Too many reps too soon — build tolerance over weeks, not sessions"],
+    scaling:"Week 1: 2-3 controlled reps is enough. Build to 5 reps over Phase 1-2. Control always beats volume here.",
+  },
+  "Broad Jump": {
+    who:"her", summary:"Primary power anchor Phase 1. Full-body explosive output. Measured for progress — make it competitive.",
+    cues:["Swing arms back and load the hips before jumping","Explode forward — drive arms forward explosively as you leave the ground","Land with both feet simultaneously","Absorb the landing softly through hips and knees","Full reset — every jump is a max effort"],
+    faults:["Rushing — each jump should be a completely fresh effort","Landing stiff-legged — teach soft landings from day one"],
+    scaling:"Make it a game. Mark her best with a cone and try to beat it each session.",
+  },
+  "Box Jump": {
+    who:"her", summary:"Power anchor Phase 2. Adds reactive landing mechanics and a vertical component.",
+    cues:["Load hips and swing arms before jumping","Land softly on the box — quiet feet is the cue","ALWAYS step down — never jump down","Full reset before each rep — quality over speed"],
+    faults:["Jumping down from box — too much impact load for a 7-year-old","Lazy landings — reinforce soft, controlled landing every single rep"],
+    scaling:"Start lower than feels necessary. Height is irrelevant — intent and landing quality are everything.",
+  },
+  "Hurdle Hops": {
+    who:"her", summary:"Power anchor Phase 3. Rapid ground contact = direct sprint transfer. Use cones as mini hurdles.",
+    cues:["Minimal time on the ground — think hot feet","Land on balls of feet only — no flat-footing","Stay tall — do not collapse at the hips between hops","Arms help — quick and rhythmic to match foot cadence"],
+    faults:["Slow ground contact — this defeats the entire purpose","Height is irrelevant — 6-8 inch cones are perfect"],
+    scaling:"Rolled-up towels or flat cones work fine. Speed of contact is the variable that matters.",
+  },
+  "Lateral Bounds": {
+    who:"her", summary:"Single-leg power and change of direction. Directly feeds 1v1 agility.",
+    cues:["Push off one foot, land on the other — single leg throughout","Stick every landing — hold 1 full second before the next bound","Drive the knee up on the push-off leg","Get distance, not height"],
+    faults:["Landing with both feet — must be single-leg contact","Not pausing on landing — the stick builds stability"],
+    scaling:"Start with smaller bounds and build distance over 2-3 sessions.",
+  },
+  "Med Ball Slam": {
+    who:"you", summary:"Total-body power expression. The whole body loads and fires — not just the arms.",
+    cues:["Reach fully overhead before slamming — maximum range of motion","Drive the ball down with your entire body — hips, core, arms together","Follow through completely — do not pull up at contact","Catch the bounce and transition smoothly into the next rep"],
+    faults:["Arm-only slam — hips and core must load and fire","Short range of motion — full overhead every rep"],
+    scaling:"Heavier ball = more strength stimulus. Lighter ball = more speed and power expression. Use lighter for this program.",
+  },
+  "Med Ball Chest Pass": {
+    who:"her", summary:"Upper body explosive output. Teaches power transfer from core through arms.",
+    cues:["Start ball at chest with elbows out","Explode through — full arm extension at release","Step into it for maximum power output","Catch and return quickly — keep it athletic"],
+    faults:["Passive throw — she should be trying to throw it as hard as possible every rep"],
+    scaling:"Use a wall if no partner. Distance from wall controls difficulty.",
+  },
+};
+
+const METRICS = [
+  { id:"sprint_10", label:"10m Sprint", unit:"sec", who:"both", lower:true },
+  { id:"sprint_30", label:"30m Sprint", unit:"sec", who:"both", lower:true },
+  { id:"broad_jump", label:"Broad Jump", unit:"in", who:"both", lower:false },
+  { id:"vertical", label:"Vertical Jump", unit:"in", who:"both", lower:false },
+  { id:"sled_20", label:"Sled Sprint 20m", unit:"sec", who:"you", lower:true },
+  { id:"clean_load", label:"Hang Clean Load", unit:"lbs", who:"you", lower:false },
+  { id:"slalom", label:"Cone Slalom (ball)", unit:"sec", who:"her", lower:true },
+  { id:"box_height", label:"Box Jump Height", unit:"in", who:"her", lower:false },
+];
+
+const RETEST_WEEKS = [1,4,7,10,12];
+
+
+const ALERTS = [
+  { type:"warn", title:"Hang Clean Technique", body:"Get an honest assessment before Week 4. Bad reps at speed are an injury risk. If it's not clicking by Week 5, swap to KB swings. No ego." },
+  { type:"warn", title:"Sled Load Calibration", body:"Start lighter than you think in Week 7. Wrong load turns a sled sprint into a sled push — completely different training quality." },
+  { type:"warn", title:"Her Recovery Signals", body:"At 7, fatigue shows as mood and motivation drops before physical signs. That's your canary. If she's not into it, convert to free play. Protecting enjoyment IS the training goal." },
+  { type:"note", title:"Trap Bar Jump Squat Form", body:"Every rep must be maximal intent. If you're grinding it, the load is too heavy. This is a power movement — not a strength movement." },
+  { type:"note", title:"Heat Management", body:"Summer + outdoor + 45 min = real heat risk for a 7-year-old. Schedule sessions before 9am or after 6pm. Build in water breaks beyond what's shown." },
+  { type:"note", title:"Nordic Tolerance", body:"Week 1 you may only manage 2-3 controlled reps. That's correct. Build slowly over Phase 1-2. Form over reps, always." },
+  { type:"note", title:"Third Person (Phase 3)", body:"Some Phase 3 soccer drills are much better with a third body. Identify a parent, sibling, or teammate now — not Week 7." },
+];
+
+const C = {
+  bg:"#05080f", card:"#0d1220", border:"#1a2035",
+  blue:"#1a3a8f", blueLight:"#4a7fe8",
+  gold:"#e8c44a", goldLight:"#f5d878",
+  red:"#c41e2a", redLight:"#e84455",
+  white:"#f0f4ff", muted:"rgba(220,228,255,0.6)", dim:"rgba(220,228,255,0.35)",
+};
+const font = { display:"'Bebas Neue', sans-serif", body:"'DM Sans', sans-serif" };
+
+function Tag({ type="together", children }) {
+  const map = {
+    you:{ bg:"rgba(26,58,143,0.35)", color:C.blueLight },
+    her:{ bg:"rgba(232,196,74,0.2)", color:C.goldLight },
+    together:{ bg:"rgba(255,255,255,0.07)", color:C.muted },
+    warn:{ bg:"rgba(196,30,42,0.25)", color:C.redLight },
+  };
+  const s = map[type]||map.together;
+  return <span style={{ display:"inline-block", fontSize:9, fontWeight:700, letterSpacing:"0.15em", textTransform:"uppercase", padding:"2px 7px", borderRadius:2, marginRight:4, background:s.bg, color:s.color }}>{children}</span>;
+}
+
+function SectionHeader({ label, title }) {
+  return (
+    <div style={{ marginBottom:20 }}>
+      <div style={{ fontSize:10, letterSpacing:"0.25em", textTransform:"uppercase", color:C.gold, marginBottom:4, fontWeight:700 }}>{label}</div>
+      <div style={{ fontFamily:font.display, fontSize:32, letterSpacing:"0.04em", color:C.white, lineHeight:1 }}>{title}</div>
+    </div>
+  );
+}
+
+function Block({ time, tag, title, children }) {
+  const tagColor = tag==="you"?C.blue : tag==="her"?C.gold : tag==="both"?C.red : "#2a2a2a";
+  return (
+    <div style={{ background:C.card, borderLeft:`3px solid ${tagColor}`, padding:"14px 18px", marginBottom:6 }}>
+      <div style={{ fontSize:10, letterSpacing:"0.18em", textTransform:"uppercase", color:C.gold, marginBottom:4 }}>
+        {time}{" "}
+        {tag==="both"?<><Tag type="you">YOU</Tag><Tag type="her">HER</Tag></>
+          :tag==="together"?<Tag type="together">TOGETHER</Tag>
+          :tag==="you"?<Tag type="you">YOU</Tag>
+          :<Tag type="her">HER</Tag>}
+      </div>
+      <div style={{ fontWeight:600, color:C.white, marginBottom:6, fontSize:14 }}>{title}</div>
+      <div style={{ fontSize:13, color:C.muted, lineHeight:1.6 }}>{children}</div>
+    </div>
+  );
+}
+
+function THead({ cols }) {
+  return (
+    <thead>
+      <tr style={{ background:"#0a1228" }}>
+        {cols.map((c,i)=><th key={i} style={{ padding:"8px 12px", textAlign:"left", fontSize:9, letterSpacing:"0.2em", textTransform:"uppercase", color:C.goldLight, fontWeight:700, borderRight:`1px solid rgba(255,255,255,0.05)` }}>{c}</th>)}
+      </tr>
+    </thead>
+  );
+}
+
+function ExBtn({ name, onClick }) {
+  if (!EXERCISES[name]) return <span style={{ color:C.muted }}>{name}</span>;
+  const who = EXERCISES[name].who;
+  return (
+    <button onClick={()=>onClick(name)} style={{ background:"none", border:"none", padding:0, color:who==="you"?C.blueLight:C.goldLight, cursor:"pointer", fontSize:"inherit", fontFamily:font.body, textDecoration:"underline", textDecorationStyle:"dotted", textUnderlineOffset:3 }}>
+      {name}
+    </button>
+  );
+}
+
+function ExModal({ name, onClose }) {
+  const ex = EXERCISES[name];
+  if (!ex) return null;
+  const accent = ex.who==="you"?C.blue:C.gold;
+  return (
+    <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.9)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:"#0d1220", border:`1px solid #1a2035`, borderTop:`4px solid ${accent}`, maxWidth:500, width:"100%", maxHeight:"82vh", overflowY:"auto", padding:28, borderRadius:2 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
+          <div>
+            <div style={{ fontSize:10, letterSpacing:"0.2em", textTransform:"uppercase", color:"#444", marginBottom:4 }}>Exercise Detail</div>
+            <div style={{ fontFamily:font.display, fontSize:26, letterSpacing:"0.04em", color:C.white }}>{name}</div>
+          </div>
+          <button onClick={onClose} style={{ background:"none", border:`1px solid #2a2a2a`, color:"#666", width:30, height:30, cursor:"pointer", fontSize:18, borderRadius:2, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, fontFamily:font.body }}>x</button>
+        </div>
+        <Tag type={ex.who}>{ex.who==="you"?"YOU":"HER"}</Tag>
+        <p style={{ color:C.muted, fontSize:13, margin:"12px 0 20px", lineHeight:1.65 }}>{ex.summary}</p>
+        {[["Cues",ex.cues,"->",C.blueLight],["Common Faults",ex.faults,"x",C.redLight]].map(([ttl,items,icon,color])=>(
+          <div key={ttl} style={{ marginBottom:20 }}>
+            <div style={{ fontSize:10, letterSpacing:"0.2em", textTransform:"uppercase", color:C.gold, marginBottom:10, fontWeight:700 }}>{ttl}</div>
+            {items.map((item,i)=>(
+              <div key={i} style={{ display:"flex", gap:10, marginBottom:8, alignItems:"flex-start" }}>
+                <span style={{ color, fontWeight:700, flexShrink:0, marginTop:1 }}>{icon}</span>
+                <span style={{ fontSize:13, color:"rgba(220,228,255,0.8)", lineHeight:1.55 }}>{item}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+        <div style={{ marginBottom:20 }}>
+          <div style={{ fontSize:10, letterSpacing:"0.2em", textTransform:"uppercase", color:C.gold, marginBottom:10, fontWeight:700 }}>Scaling</div>
+          <p style={{ fontSize:13, color:C.muted, lineHeight:1.6, margin:0 }}>{ex.scaling}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlanTab({ onEx }) {
+  return (
+    <div>
+      <div style={{ marginBottom:40 }}>
+        <SectionHeader label="Program Architecture" title="PERIODIZATION" />
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:2, marginBottom:24 }}>
+          {PHASES.map(p=>(
+            <div key={p.num} style={{ background:C.card, padding:"18px 16px", borderTop:`3px solid ${p.color}` }}>
+              <div style={{ fontSize:10, letterSpacing:"0.2em", textTransform:"uppercase", color:C.gold, marginBottom:4 }}>Weeks {p.weeks}</div>
+              <div style={{ fontFamily:font.display, fontSize:22, color:C.white, marginBottom:6 }}>{p.name}</div>
+              <div style={{ fontSize:12, color:C.muted, lineHeight:1.5 }}>{p.desc}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.15em", textTransform:"uppercase", color:C.gold, marginBottom:10 }}>Anchor Movements — Measured Each Phase</div>
+        <div style={{ overflowX:"auto", border:`1px solid ${C.border}`, marginBottom:16 }}>
+          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+            <THead cols={["Phase","Your Anchor","Her Anchor"]} />
+            <tbody>
+              {[
+                ["1 — Build","Trap Bar Jump Squat","Broad Jump"],
+                ["2 — Load","Hang Power Clean","Box Jump"],
+                ["3 — Power","Sled Sprint (timed)","Hurdle Hops"],
+                ["4 — Peak","Hang Power Clean + Sled Sprint","Broad Jump + Box Jump (retest)"],
+              ].map((row,ri)=>(
+                <tr key={ri} style={{ borderBottom:`1px solid ${C.border}` }}>
+                  {row.map((cell,ci)=><td key={ci} style={{ padding:"9px 12px", color:ci===0?C.white:C.muted, fontWeight:ci===0?600:400, borderRight:`1px solid ${C.border}`, verticalAlign:"top", lineHeight:1.5 }}>{cell}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style={{ marginBottom:40 }}>
+        <SectionHeader label="Monday" title="SPEED + POWER" />
+        <Block time="0-8 min" tag="together" title="Warm-Up">2 min jog · Leg swings · Hip circles · A-skips · High knees · 2x10m buildups at 70% and 85%</Block>
+        <Block time="8-20 min" tag="together" title="Speed Block — Track or Hill">
+          <div style={{ marginBottom:10 }}>Full recovery between every rep. She runs shorter distances at same effort level.</div>
+          <div style={{ overflowX:"auto" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+              <THead cols={["Phase","You","Her"]} />
+              <tbody>
+                {[
+                  ["1","6x20m acceleration — standing start, build to top speed","6x15m acceleration"],
+                  ["2","6x30m with full rest between each rep","6x20m with full rest"],
+                  ["3","4x Flying 20s: 10m build-up + 20m at max velocity","4x Flying 15s: 8m build-up + 15m max"],
+                  ["4","4x30m at 100% effort","4x20m at 100% effort"],
+                ].map(([phase,you,her])=>(
+                  <tr key={phase} style={{ borderBottom:`1px solid ${C.border}` }}>
+                    <td style={{ padding:"9px 12px", color:C.white, fontWeight:600, verticalAlign:"top", whiteSpace:"nowrap" }}>{phase}</td>
+                    <td style={{ padding:"9px 12px", color:C.muted, verticalAlign:"top", lineHeight:1.5 }}>{you}</td>
+                    <td style={{ padding:"9px 12px", color:C.muted, verticalAlign:"top", lineHeight:1.5 }}>{her}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Block>
+        <Block time="20-38 min" tag="both" title="Power Block — Parallel Work">
+          <div style={{ overflowX:"auto", marginTop:8 }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+              <THead cols={["Phase","You","Her"]} />
+              <tbody>
+                {[
+                  { p:"1", you:[["Trap Bar Jump Squat","4x4 light, max intent"],["KB Swing","2x8"]], her:[["Broad Jump","4x4 max distance"],["Box Step-Ups","2x6"]] },
+                  { p:"2", you:[["Hang Power Clean","4x3 speed priority"],["Trap Bar Jump Squat","2x4"]], her:[["Box Jump","4x4 step down"],["Lateral Bounds","2x6 each side"]] },
+                  { p:"3", you:[["Sled Sprint","4x20m, 2 min rest"],["Hang Power Clean","2x4 heavy"]], her:[["Hurdle Hops","4x6 rapid"],["Box Jump","2x4"]] },
+                  { p:"4", you:[["Hang Power Clean","3x3 peak weight"],["Sled Sprint","3x20m max"]], her:[["Broad Jump","3x3 retest"],["Box Jump","3x3 retest"]] },
+                ].map(({p,you,her})=>(
+                  <tr key={p} style={{ borderBottom:`1px solid ${C.border}` }}>
+                    <td style={{ padding:"10px 12px", color:C.white, fontWeight:600, verticalAlign:"top" }}>{p}</td>
+                    <td style={{ padding:"10px 12px", color:C.muted, verticalAlign:"top" }}>
+                      {you.map(([name,desc],i)=><div key={i} style={{ marginBottom:i<you.length-1?6:0 }}><ExBtn name={name} onClick={onEx}/> <span style={{ color:C.dim, fontSize:11 }}>{desc}</span></div>)}
+                    </td>
+                    <td style={{ padding:"10px 12px", color:C.muted, verticalAlign:"top" }}>
+                      {her.map(([name,desc],i)=><div key={i} style={{ marginBottom:i<her.length-1?6:0 }}><ExBtn name={name} onClick={onEx}/> <span style={{ color:C.dim, fontSize:11 }}>{desc}</span></div>)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Block>
+        <Block time="38-45 min" tag="both" title="Cool-Down + Nordics">
+          <div>Together: Static stretch 3-4 min</div>
+          <div style={{ marginTop:8 }}><Tag type="you">YOU ONLY</Tag> <ExBtn name="Nordic Hamstring Curl" onClick={onEx}/> — Phase 1-2: 2x5 · Phase 3-4: 3x5. Her: free play with ball.</div>
+        </Block>
+      </div>
+
+      <div style={{ marginBottom:40 }}>
+        <SectionHeader label="Wednesday" title="SOCCER SKILLS" />
+        <Block time="0-8 min" tag="together" title="Warm-Up">Rondo passing · Dynamic movement · Light juggling</Block>
+        <Block time="8-25 min" tag="her" title="Technical Block">First touch · Turning · Dribbling at speed. You feed balls, rebound, apply light passive pressure. Increase difficulty each phase.</Block>
+        <Block time="25-38 min" tag="her" title="1v1 Block">Live defense from you (controlled). Attack/defend sequences in tight space. Phase 4: full effort to simulate tryout pressure.</Block>
+        <Block time="38-45 min" tag="together" title="Cool-Down">Static stretch · Discuss one thing she did well · Set one technical focus for next session</Block>
+      </div>
+
+      <div style={{ marginBottom:40 }}>
+        <SectionHeader label="Friday" title="POWER ENDURANCE" />
+        <Block time="0-8 min" tag="together" title="Warm-Up">Jog + dynamic stretch · 2x20m buildups</Block>
+        {[
+          { phase:"PHASE 1 — Weeks 1-3", color:C.blue, meta:"3 rounds · 30 sec rest after station 4 · Focus: learn the movements, build work capacity",
+            rows:[["1","KB Swing x8","Med Ball Chest Pass x6","None"],["2","Med Ball Slam x6","Broad Jump x4","None"],["3","Sled Push 20m","Sprint 20m","None"],["4","Trap Bar Jump Squat x4","Box Jump x3","30 sec"]], finisher:null },
+          { phase:"PHASE 2 — Weeks 4-6", color:C.gold, meta:"4 rounds · 25 sec rest after station 4 · Focus: add volume, slight load increase",
+            rows:[["1","KB Swing x10","Med Ball Chest Pass x8","None"],["2","Med Ball Slam x8","Broad Jump x5","None"],["3","Sled Push 20m","Sprint 20m","None"],["4","Trap Bar Jump Squat x5","Box Jump x4","25 sec"]], finisher:null },
+          { phase:"PHASE 3 — Weeks 7-9", color:C.red, meta:"4 rounds · 20 sec rest after station 4 · Focus: max power output under real fatigue",
+            rows:[["1","KB Swing x12","Med Ball Chest Pass x10","None"],["2","Med Ball Slam x10","Broad Jump x6","None"],["3","Sled Push 20m (heavier)","Sprint 20m","None"],["4","Trap Bar Jump Squat x6","Box Jump x5","20 sec"]], finisher:null },
+          { phase:"PHASE 4 — Weeks 10-12", color:C.white, meta:"3 rounds · 20 sec rest · Volume down, intensity max · Her: tryout finisher added after circuit",
+            rows:[["1","KB Swing x10","Med Ball Chest Pass x8","None"],["2","Med Ball Slam x8","Broad Jump x5","None"],["3","Sled Push 20m (heaviest)","Sprint 20m","None"],["4","Trap Bar Jump Squat x5","Box Jump x4","20 sec"]],
+            finisher:"5x 1v1 reps at 30 sec each, minimal rest. You play live defense. Simulates decisions under fatigue — exactly what tryout evaluators see." },
+        ].map(({ phase, color, meta, rows, finisher })=>(
+          <div key={phase} style={{ marginBottom:16 }}>
+            <div style={{ fontFamily:font.display, fontSize:16, letterSpacing:"0.06em", color, marginBottom:4, marginTop:20 }}>{phase}</div>
+            <div style={{ fontSize:12, color:C.dim, marginBottom:8 }}>{meta}</div>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12, border:`1px solid ${C.border}` }}>
+              <THead cols={["Station","You","Her","Rest"]} />
+              <tbody>
+                {rows.map(([st,y,h,r])=>{
+                  const yName = y.replace(/ x\d+| \(.*\)/g,"");
+                  const hName = h.replace(/ x\d+/g,"");
+                  const yReps = y.match(/x\d+/)?.[0]||"";
+                  const hReps = h.match(/x\d+/)?.[0]||"";
+                  const yExtra = y.includes("heavier")?" (heavier)":y.includes("heaviest")?" (heaviest)":"";
+                  return (
+                    <tr key={st} style={{ borderBottom:`1px solid ${C.border}` }}>
+                      <td style={{ padding:"8px 12px", color:C.white, fontWeight:600 }}>{st}</td>
+                      <td style={{ padding:"8px 12px", color:C.muted }}><ExBtn name={yName} onClick={onEx}/><span style={{ color:C.dim }}> {yReps}{yExtra}</span></td>
+                      <td style={{ padding:"8px 12px", color:C.muted }}><ExBtn name={hName} onClick={onEx}/><span style={{ color:C.dim }}> {hReps}</span></td>
+                      <td style={{ padding:"8px 12px", color:C.dim, fontSize:11 }}>{r}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {finisher && (
+              <div style={{ background:"rgba(232,196,74,0.08)", border:`1px solid rgba(232,196,74,0.2)`, borderLeft:`4px solid ${C.gold}`, padding:"12px 16px", marginTop:6, fontSize:12 }}>
+                <span style={{ fontWeight:700, color:C.goldLight }}>Her tryout finisher (after circuit): </span>
+                <span style={{ color:C.muted }}>{finisher}</span>
+              </div>
+            )}
+          </div>
+        ))}
+        <Block time="38-45 min" tag="both" title="Cool-Down + Nordics">
+          <div>Together: Static stretch 3 min</div>
+          <div style={{ marginTop:8 }}><Tag type="you">YOU ONLY</Tag> <ExBtn name="Nordic Hamstring Curl" onClick={onEx}/> — same prescription as Monday. Phase 1-2: 2x5 · Phase 3-4: 3x5</div>
+        </Block>
+      </div>
+
+      <div style={{ marginBottom:40 }}>
+        <SectionHeader label="Tuesday + Thursday" title="SOCCER DAYS" />
+        <p style={{ fontSize:13, color:C.muted, marginBottom:20, lineHeight:1.6 }}>Play-based. Keep it fun. Pick 1-2 per session and let her lead the energy.</p>
+        {[
+          { phase:"Phase 1 — Foundation (Wks 1-3)", drills:[
+            { name:"Gates Dribbling", desc:"6-8 mini gates (cones 1m apart) randomly placed across half field. Dribble through as many as possible in 60 sec. You count and reset." },
+            { name:"Shadow Dribbling", desc:"She dribbles and mirrors your movement exactly. Builds body awareness and ball-eye coordination without any pressure." },
+          ]},
+          { phase:"Phase 2 — 1v1 Introduction (Wks 4-6)", drills:[
+            { name:"Shark Attack", desc:"She dribbles in a 15x15m grid while you try to knock her ball out (go easy). Builds ball protection and awareness under pressure." },
+            { name:"1v1 to Small Goals", desc:"Two 2m goals 15m apart. Straight 1v1. Keep games to 3 min with rest. Track wins loosely." },
+          ]},
+          { phase:"Phase 3 — Positional Awareness (Wks 7-9)", drills:[
+            { name:"Directional Rondo", desc:"You serve balls from different positions. She receives, turns, and plays to a target cone in a specific zone. Simulates receiving under positional pressure." },
+            { name:"Channel Game", desc:"Field split into 3 vertical channels. She must receive and move ball into the correct channel based on your calls. Builds scanning and decision speed." },
+          ]},
+          { phase:"Phase 4 — Tryout Simulation (Wks 10-12)", drills:[
+            { name:"1v1 Gauntlet", desc:"5 consecutive 1v1 reps, 30 sec each, minimal rest. Simulates tryout fatigue and competitive pressure." },
+            { name:"Decision Dribbling", desc:"You call a color/number cone as she approaches — she must react and change direction instantly. Builds the read-and-react skill evaluators look for." },
+          ]},
+        ].map(({ phase, drills })=>(
+          <div key={phase} style={{ marginBottom:20 }}>
+            <div style={{ fontFamily:font.display, fontSize:18, color:C.gold, letterSpacing:"0.05em", marginBottom:8 }}>{phase}</div>
+            {drills.map(d=>(
+              <div key={d.name} style={{ background:C.card, padding:"12px 16px", marginBottom:2, display:"flex", gap:14, flexWrap:"wrap" }}>
+                <div style={{ fontSize:12, fontWeight:700, color:C.white, minWidth:160 }}>{d.name}</div>
+                <div style={{ fontSize:12, color:C.muted, lineHeight:1.55, flex:1 }}>{d.desc}</div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginBottom:40 }}>
+        <SectionHeader label="Address Before Week 1" title="KNOWN UNKNOWNS" />
+        {ALERTS.map((a,i)=>(
+          <div key={i} style={{ background:a.type==="warn"?"rgba(196,30,42,0.1)":"rgba(232,196,74,0.07)", border:`1px solid ${a.type==="warn"?"rgba(196,30,42,0.3)":"rgba(232,196,74,0.2)"}`, borderLeft:`4px solid ${a.type==="warn"?C.red:C.gold}`, padding:"13px 18px", marginBottom:8, fontSize:13 }}>
+            <span style={{ fontWeight:700, color:a.type==="warn"?C.redLight:C.goldLight }}>{a.title}. </span>
+            <span style={{ color:"rgba(220,228,255,0.8)" }}>{a.body}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProgressTab({ data, onDataChange, onSave }) {
+  const [week, setWeek] = useState(1);
+  const [entries, setEntries] = useState(()=>data[`w${week}`]||{});
+  const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(()=>{ setEntries(data[`w${week}`]||{}); }, [week, data]);
+
+  const handleChange = (id, who, val) => {
+    const next = {...entries,[`${id}_${who}`]:val};
+    setEntries(next);
+    setSaved(false);
+    onDataChange({...data,[`w${week}`]:next});
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
+    await onSave({...data,[`w${week}`]:entries});
+    setLoading(false);
+    setSaved(true);
+    setTimeout(()=>setSaved(false),2500);
+  };
+
+  const getDelta = (metricId, who) => {
+    const cur = parseFloat(data[`w${week}`]?.[`${metricId}_${who}`]);
+    const prevWeek = [...RETEST_WEEKS].reverse().find(w=>w<week);
+    if (!prevWeek) return null;
+    const prev = parseFloat(data[`w${prevWeek}`]?.[`${metricId}_${who}`]);
+    if (isNaN(cur)||isNaN(prev)||prev===0) return null;
+    return { delta:cur-prev, prev };
+  };
+
+  const renderGroup = (whoFilter, label, accent) => {
+    const metrics = METRICS.filter(m=>m.who==="both"||m.who===whoFilter);
+    return (
+      <div style={{ marginBottom:28 }}>
+        <div style={{ fontFamily:font.display, fontSize:20, letterSpacing:"0.05em", color:accent, marginBottom:12, paddingBottom:10, borderBottom:`1px solid ${C.border}` }}>{label}</div>
+        {metrics.map(m=>{
+          const key = `${m.id}_${whoFilter}`;
+          const val = entries[key]||"";
+          const result = getDelta(m.id,whoFilter);
+          const improved = result&&(m.lower?result.delta<0:result.delta>0);
+          const worsened = result&&(m.lower?result.delta>0:result.delta<0);
+          const pct = result?Math.abs((result.delta/result.prev)*100).toFixed(1):null;
+          return (
+            <div key={m.id} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6, padding:"10px 14px", background:C.card, borderLeft:`3px solid ${accent}` }}>
+              <div style={{ flex:1, fontSize:13, color:C.white, fontWeight:500 }}>{m.label}</div>
+              <input type="number" step="0.01" placeholder="—" value={val}
+                onChange={e=>handleChange(m.id,whoFilter,e.target.value)}
+                style={{ width:80, background:"#05080f", border:`1px solid #1a2035`, color:C.white, padding:"6px 10px", fontSize:14, fontFamily:font.body, borderRadius:2, textAlign:"right", outline:"none" }}
+              />
+              <div style={{ fontSize:11, color:C.dim, width:32 }}>{m.unit}</div>
+              {result!==null?(
+                <div style={{ width:72, fontSize:11, textAlign:"right", color:improved?C.blueLight:worsened?C.redLight:C.dim, fontWeight:600 }}>
+                  {improved?"up":worsened?"dn":"-"} {pct}%
+                </div>
+              ):<div style={{ width:72 }}/>}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const hasAnyData = RETEST_WEEKS.some(w=>data[`w${w}`]&&Object.values(data[`w${w}`]).some(v=>v!==""));
+
+  return (
+    <div>
+      <SectionHeader label="Track Progress" title="MEASUREMENTS" />
+      <p style={{ fontSize:13, color:C.muted, marginBottom:20, lineHeight:1.6 }}>Record baseline Week 1. Re-test at start of each new phase. Deltas appear automatically once you have two data points.</p>
+      <div style={{ marginBottom:28 }}>
+        <div style={{ fontSize:10, letterSpacing:"0.2em", textTransform:"uppercase", color:"#444", marginBottom:10 }}>Select Test Week</div>
+        <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
+          {RETEST_WEEKS.map(w=>{
+            const hasData = !!(data[`w${w}`]&&Object.values(data[`w${w}`]).some(v=>v!==""));
+            return (
+              <button key={w} onClick={()=>setWeek(w)} style={{
+                padding:"8px 14px", background:week===w?C.blue:C.card,
+                border:`1px solid ${week===w?C.blue:C.border}`,
+                color:week===w?C.white:hasData?C.blueLight:"#555",
+                cursor:"pointer", fontSize:12, fontWeight:600, fontFamily:font.body, borderRadius:2, position:"relative",
+              }}>
+                {w===1?"Wk 1 — Baseline":w===12?"Wk 12 — Peak":`Week ${w}`}
+                {hasData&&week!==w&&<span style={{ position:"absolute", top:4, right:4, width:5, height:5, borderRadius:"50%", background:C.gold }}/>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {renderGroup("you","YOUR METRICS",C.blue)}
+      {renderGroup("her","HER METRICS",C.gold)}
+      <div style={{ display:"flex", alignItems:"center", gap:14, marginTop:8, marginBottom:40 }}>
+        <button onClick={handleSave} disabled={loading} style={{
+          background:saved?"#1a3a8f":"#0d1a3a", border:`1px solid ${saved?C.blue:"#1a2a5a"}`,
+          color:saved?C.white:C.blueLight, padding:"10px 24px", fontSize:13, fontWeight:700,
+          fontFamily:font.body, cursor:"pointer", borderRadius:2, letterSpacing:"0.1em",
+          textTransform:"uppercase", transition:"all 0.2s",
+        }}>
+          {loading?"Saving...":saved?"Saved ✓":"Save Results"}
+        </button>
+        {week>1&&<span style={{ fontSize:12, color:C.dim }}>Deltas compare to previous test week</span>}
+      </div>
+      {hasAnyData&&(
+        <div>
+          <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.15em", textTransform:"uppercase", color:C.gold, marginBottom:16 }}>Progress Charts</div>
+          {METRICS.slice(0,4).map(m=>{
+            const points = RETEST_WEEKS.map(w=>{
+              const yv = parseFloat(data[`w${w}`]?.[`${m.id}_you`]);
+              const hv = parseFloat(data[`w${w}`]?.[`${m.id}_her`]);
+              return { w, you:isNaN(yv)?null:yv, her:isNaN(hv)?null:hv };
+            }).filter(p=>p.you!==null||p.her!==null);
+            if (points.length<2) return null;
+            const allVals = points.flatMap(p=>[p.you,p.her]).filter(v=>v!==null);
+            const min=Math.min(...allVals), max=Math.max(...allVals), range=max-min||1;
+            const W=260, H=60;
+            const px=w=>((RETEST_WEEKS.indexOf(w))/(RETEST_WEEKS.length-1))*W;
+            const py=v=>H-((v-min)/range*H*0.8)-H*0.1;
+            const makePath=key=>{
+              const valid=points.filter(p=>p[key]!==null);
+              if (valid.length<2) return "";
+              return valid.map((p,i)=>`${i===0?"M":"L"}${px(p.w)},${py(p[key])}`).join(" ");
+            };
+            return (
+              <div key={m.id} style={{ background:C.card, padding:"14px 18px", marginBottom:6, display:"flex", alignItems:"center", gap:20, flexWrap:"wrap" }}>
+                <div style={{ fontSize:12, fontWeight:600, color:C.white, width:120, flexShrink:0 }}>{m.label}</div>
+                <svg width={W} height={H} style={{ overflow:"visible", flexShrink:0 }}>
+                  {RETEST_WEEKS.map(w=><line key={w} x1={px(w)} x2={px(w)} y1={0} y2={H} stroke="#1a2035" strokeWidth={1}/>)}
+                  {makePath("you")&&<path d={makePath("you")} fill="none" stroke={C.blueLight} strokeWidth={2}/>}
+                  {makePath("her")&&<path d={makePath("her")} fill="none" stroke={C.goldLight} strokeWidth={2} strokeDasharray="4 2"/>}
+                  {points.map(p=>p.you!==null&&<circle key={`y${p.w}`} cx={px(p.w)} cy={py(p.you)} r={3} fill={C.blueLight}/>)}
+                  {points.map(p=>p.her!==null&&<circle key={`h${p.w}`} cx={px(p.w)} cy={py(p.her)} r={3} fill={C.goldLight}/>)}
+                </svg>
+                <div style={{ fontSize:11, color:C.dim }}>
+                  <div style={{ color:C.blueLight, marginBottom:2 }}>— You</div>
+                  <div style={{ color:C.goldLight }}>--- Her</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LoginScreen() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState('login');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    setError('');
+    const { error } = mode === 'login'
+      ? await db.auth.signInWithPassword({ email, password })
+      : await db.auth.signUp({ email, password });
+    if (error) setError(error.message);
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ background:C.bg, minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:font.body }}>
+      <div style={{ width:'100%', maxWidth:360, padding:'0 24px' }}>
+        <div style={{ fontFamily:font.display, fontSize:52, color:C.white, lineHeight:0.9, marginBottom:4 }}>SUPERGIRL</div>
+        <div style={{ fontFamily:font.display, fontSize:52, color:C.gold, lineHeight:0.9, marginBottom:36 }}>SUMMER</div>
+        <div style={{ marginBottom:14 }}>
+          <div style={{ fontSize:10, letterSpacing:'0.2em', textTransform:'uppercase', color:C.dim, marginBottom:6 }}>Email</div>
+          <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+            style={{ width:'100%', background:C.card, border:`1px solid ${C.border}`, color:C.white, padding:'10px 14px', fontSize:14, fontFamily:font.body, borderRadius:2, outline:'none' }}
+          />
+        </div>
+        <div style={{ marginBottom:20 }}>
+          <div style={{ fontSize:10, letterSpacing:'0.2em', textTransform:'uppercase', color:C.dim, marginBottom:6 }}>Password</div>
+          <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&handleSubmit()}
+            style={{ width:'100%', background:C.card, border:`1px solid ${C.border}`, color:C.white, padding:'10px 14px', fontSize:14, fontFamily:font.body, borderRadius:2, outline:'none' }}
+          />
+        </div>
+        {error&&<div style={{ fontSize:12, color:C.redLight, marginBottom:14 }}>{error}</div>}
+        <button onClick={handleSubmit} disabled={loading} style={{
+          width:'100%', background:C.blue, border:'none', color:C.white,
+          padding:'12px', fontSize:13, fontWeight:700, fontFamily:font.body,
+          cursor:'pointer', borderRadius:2, letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:14,
+        }}>
+          {loading?'...' : mode==='login'?'Log In':'Create Account'}
+        </button>
+        <button onClick={()=>{setMode(mode==='login'?'signup':'login');setError('');}} style={{
+          background:'none', border:'none', color:C.dim, fontSize:12, cursor:'pointer', fontFamily:font.body, width:'100%', textAlign:'center',
+        }}>
+          {mode==='login'?"Don't have an account? Sign up":"Already have an account? Log in"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [session, setSession] = useState(undefined);
+  const [tab, setTab] = useState('plan');
+  const [modal, setModal] = useState(null);
+  const [data, setData] = useState({});
+
+  useEffect(()=>{
+    db.auth.getSession().then(({ data: { session } })=>{
+      setSession(session||null);
+      if (session) loadData(session.user.id).then(d=>setData(d||{}));
+    });
+    const { data: { subscription } } = db.auth.onAuthStateChange(async (event, session)=>{
+      setSession(session||null);
+      if (session) { const d = await loadData(session.user.id); setData(d||{}); }
+      else setData({});
+    });
+    return ()=>subscription.unsubscribe();
+  },[]);
+
+  const handleDataChange = (newData) => setData(newData);
+  const handleSave = async (newData) => {
+    setData(newData);
+    if (session) await saveData(session.user.id, newData);
+  };
+
+  if (session===undefined) return (
+    <div style={{ background:C.bg, minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <div style={{ color:C.dim, fontSize:13, letterSpacing:'0.1em' }}>Loading...</div>
+    </div>
+  );
+
+  if (!session) return <LoginScreen />;
+
+  return (
+    <div style={{ background:C.bg, minHeight:"100vh", fontFamily:font.body, color:C.white }}>
+      <div style={{ background:"linear-gradient(135deg, #0a0d1f 0%, #12183a 40%, #2a0a10 100%)", padding:"48px 28px 40px", borderBottom:`3px solid ${C.gold}`, position:"relative", overflow:"hidden" }}>
+        <div style={{ position:"absolute", inset:0, backgroundImage:"repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,0.025) 39px,rgba(255,255,255,0.025) 40px),repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(255,255,255,0.025) 39px,rgba(255,255,255,0.025) 40px)", pointerEvents:"none" }}/>
+        <div style={{ maxWidth:800, margin:"0 auto", position:"relative" }}>
+          <div style={{ fontSize:10, letterSpacing:"0.3em", textTransform:"uppercase", color:C.goldLight, marginBottom:12, opacity:0.85 }}>12-Week Training Program · Father + Daughter</div>
+          <div style={{ fontFamily:font.display, fontSize:"clamp(52px,11vw,100px)", lineHeight:0.88, letterSpacing:"0.02em", marginBottom:8 }}>
+            SUPERGIRL<br/><span style={{ color:C.gold }}>SUMMER</span>
+          </div>
+          <div style={{ fontSize:13, color:"rgba(220,228,255,0.4)", letterSpacing:"0.18em", textTransform:"uppercase", marginBottom:24, fontWeight:300 }}>Speed · Power · Soccer</div>
+          <div style={{ display:"flex", gap:28, flexWrap:"wrap" }}>
+            {[["12","Weeks"],["3","Structured Days/Wk"],["2","Soccer Days/Wk"],["45","Min/Session"],["WK12","Peak/Tryout"]].map(([v,l])=>(
+              <div key={l}>
+                <div style={{ fontFamily:font.display, fontSize:26, color:C.gold, lineHeight:1 }}>{v}</div>
+                <div style={{ fontSize:10, letterSpacing:"0.12em", textTransform:"uppercase", color:"rgba(220,228,255,0.4)", marginTop:2 }}>{l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div style={{ background:"#080c18", borderBottom:`1px solid ${C.border}`, position:"sticky", top:0, zIndex:100 }}>
+        <div style={{ maxWidth:800, margin:"0 auto", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <div style={{ display:"flex" }}>
+            {[{id:"plan",label:"Training Plan"},{id:"progress",label:"Track Progress"}].map(t=>(
+              <button key={t.id} onClick={()=>setTab(t.id)} style={{
+                padding:"14px 20px", background:"none", border:"none",
+                borderBottom:`2px solid ${tab===t.id?C.gold:"transparent"}`,
+                color:tab===t.id?C.gold:"#555",
+                cursor:"pointer", fontSize:12, fontWeight:700, fontFamily:font.body,
+                letterSpacing:"0.08em", textTransform:"uppercase", transition:"all 0.15s",
+              }}>{t.label}</button>
+            ))}
+          </div>
+          <button onClick={()=>db.auth.signOut()} style={{
+            background:"none", border:"none", color:C.dim, fontSize:11, cursor:"pointer",
+            fontFamily:font.body, letterSpacing:"0.1em", textTransform:"uppercase", padding:"0 20px",
+          }}>Sign Out</button>
+        </div>
+      </div>
+      <div style={{ maxWidth:800, margin:"0 auto", padding:"36px 20px 60px" }}>
+        {tab==="plan"&&<PlanTab onEx={setModal}/>}
+        {tab==="progress"&&<ProgressTab data={data} onDataChange={handleDataChange} onSave={handleSave}/>}
+      </div>
+      {modal&&<ExModal name={modal} onClose={()=>setModal(null)}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>
